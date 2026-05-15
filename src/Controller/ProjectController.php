@@ -7,14 +7,25 @@ use App\Entity\User;
 use App\Repository\ProjectRepository;
 use App\Security\Voter\ProjectVoter;
 use Doctrine\ORM\EntityManagerInterface;
+use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
 
+#[OA\Tag(name: 'Projects')]
 #[Route('/projects')]
 final class ProjectController extends AbstractController
 {
+    #[OA\Get(
+        path: '/projects',
+        summary: 'List projects visible by the authenticated user',
+        security: [['bearerAuth' => []]],
+        responses: [
+            new OA\Response(response: 200, description: 'Project list'),
+            new OA\Response(response: 401, description: 'Unauthorized')
+        ]
+    )]
     #[Route('', name: 'project_index', methods: ['GET'])]
     public function index(ProjectRepository $projectRepository): JsonResponse
     {
@@ -36,6 +47,32 @@ final class ProjectController extends AbstractController
         return $this->json(array_map([$this, 'formatProject'], $projects));
     }
 
+    #[OA\Post(
+        path: '/projects',
+        summary: 'Create a new project',
+        security: [['bearerAuth' => []]],
+        tags: ['Projects'],
+        responses: [
+            new OA\Response(response: 201, description: 'Project created'),
+            new OA\Response(response: 400, description: 'Invalid payload'),
+            new OA\Response(response: 401, description: 'Unauthorized')
+        ]
+    )]
+    #[OA\RequestBody(
+        required: true,
+        description: 'Project data',
+        content: new OA\JsonContent(
+            type: 'object',
+            required: ['title', 'startAt'],
+            properties: [
+                new OA\Property(property: 'title', type: 'string', example: 'Projet TaskFlow'),
+                new OA\Property(property: 'description', type: 'string', nullable: true, example: 'Premier projet de test'),
+                new OA\Property(property: 'startAt', type: 'string', format: 'date', example: '2026-05-15'),
+                new OA\Property(property: 'endAt', type: 'string', format: 'date', nullable: true, example: '2026-06-15'),
+                new OA\Property(property: 'status', type: 'string', enum: ['active', 'archived'], example: 'active')
+            ]
+        )
+    )]
     #[Route('', name: 'project_create', methods: ['POST'])]
     public function create(Request $request, EntityManagerInterface $entityManager): JsonResponse
     {
@@ -85,6 +122,20 @@ final class ProjectController extends AbstractController
         return $this->json($this->formatProject($project), 201);
     }
 
+    #[OA\Get(
+        path: '/projects/{id}',
+        summary: 'Get one project',
+        security: [['bearerAuth' => []]],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Project details'),
+            new OA\Response(response: 401, description: 'Unauthorized'),
+            new OA\Response(response: 403, description: 'Access denied'),
+            new OA\Response(response: 404, description: 'Project not found')
+        ]
+    )]
     #[Route('/{id}', name: 'project_show', methods: ['GET'])]
     public function show(Project $project): JsonResponse
     {
@@ -93,6 +144,36 @@ final class ProjectController extends AbstractController
         return $this->json($this->formatProject($project));
     }
 
+    #[OA\Patch(
+        path: '/projects/{id}',
+        summary: 'Update a project',
+        security: [['bearerAuth' => []]],
+        tags: ['Projects'],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Project updated'),
+            new OA\Response(response: 400, description: 'Invalid payload'),
+            new OA\Response(response: 401, description: 'Unauthorized'),
+            new OA\Response(response: 403, description: 'Access denied'),
+            new OA\Response(response: 404, description: 'Project not found')
+        ]
+    )]
+    #[OA\RequestBody(
+        required: true,
+        description: 'Fields to update',
+        content: new OA\JsonContent(
+            type: 'object',
+            properties: [
+                new OA\Property(property: 'title', type: 'string', example: 'Projet TaskFlow modifié'),
+                new OA\Property(property: 'description', type: 'string', nullable: true, example: 'Description mise à jour'),
+                new OA\Property(property: 'startAt', type: 'string', format: 'date', example: '2026-05-15'),
+                new OA\Property(property: 'endAt', type: 'string', format: 'date', nullable: true, example: '2026-06-15'),
+                new OA\Property(property: 'status', type: 'string', enum: ['active', 'archived'], example: 'archived')
+            ]
+        )
+    )]
     #[Route('/{id}', name: 'project_update', methods: ['PATCH'])]
     public function update(Project $project, Request $request, EntityManagerInterface $entityManager): JsonResponse
     {
@@ -155,6 +236,20 @@ final class ProjectController extends AbstractController
         return $this->json($this->formatProject($project));
     }
 
+    #[OA\Delete(
+        path: '/projects/{id}',
+        summary: 'Delete a project',
+        security: [['bearerAuth' => []]],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))
+        ],
+        responses: [
+            new OA\Response(response: 204, description: 'Project deleted'),
+            new OA\Response(response: 401, description: 'Unauthorized'),
+            new OA\Response(response: 403, description: 'Access denied'),
+            new OA\Response(response: 404, description: 'Project not found')
+        ]
+    )]
     #[Route('/{id}', name: 'project_delete', methods: ['DELETE'])]
     public function delete(Project $project, EntityManagerInterface $entityManager): JsonResponse
     {

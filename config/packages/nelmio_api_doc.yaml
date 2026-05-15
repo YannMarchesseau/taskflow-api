@@ -1,9 +1,21 @@
 nelmio_api_doc:
     documentation:
         info:
-            title: My App
-            description: This is an awesome app!
+            title: TaskFlow API
+            description: API REST sécurisée pour une application de gestion de projets agile.
             version: 1.0.0
-    areas: # to filter documented areas
+        components:
+            securitySchemes:
+                bearerAuth:
+                    type: http
+                    scheme: bearer
+                    bearerFormat: JWT
+        security:
+            - bearerAuth: []
+    areas:
         path_patterns:
-            - ^/api(?!/doc$) # Accepts routes under /api except /api/doc
+            - ^/auth
+            - ^/me$
+            - ^/projects
+            - ^/tasks
+            - ^/tags

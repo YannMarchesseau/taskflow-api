@@ -8,13 +8,30 @@ use App\Entity\User;
 use App\Repository\UserRepository;
 use App\Security\Voter\ProjectVoter;
 use Doctrine\ORM\EntityManagerInterface;
+use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
 
+#[OA\Tag(name: 'Tasks')]
 final class TaskController extends AbstractController
 {
+    #[OA\Get(
+        path: '/projects/{id}/tasks',
+        summary: 'List tasks for a project',
+        tags: ['Tasks'],
+        security: [['bearerAuth' => []]],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, description: 'Project ID', schema: new OA\Schema(type: 'integer'))
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Task list'),
+            new OA\Response(response: 401, description: 'Unauthorized'),
+            new OA\Response(response: 403, description: 'Access denied'),
+            new OA\Response(response: 404, description: 'Project not found')
+        ]
+    )]
     #[Route('/projects/{id}/tasks', name: 'task_index', methods: ['GET'])]
     public function index(Project $project): JsonResponse
     {
@@ -23,6 +40,38 @@ final class TaskController extends AbstractController
         return $this->json(array_map([$this, 'formatTask'], $project->getTasks()->toArray()));
     }
 
+    #[OA\Post(
+        path: '/projects/{id}/tasks',
+        summary: 'Create a task in a project',
+        tags: ['Tasks'],
+        security: [['bearerAuth' => []]],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, description: 'Project ID', schema: new OA\Schema(type: 'integer'))
+        ],
+        responses: [
+            new OA\Response(response: 201, description: 'Task created'),
+            new OA\Response(response: 400, description: 'Invalid payload'),
+            new OA\Response(response: 401, description: 'Unauthorized'),
+            new OA\Response(response: 403, description: 'Access denied'),
+            new OA\Response(response: 404, description: 'Project or assignee not found')
+        ]
+    )]
+    #[OA\RequestBody(
+        required: true,
+        description: 'Task data',
+        content: new OA\JsonContent(
+            type: 'object',
+            required: ['title'],
+            properties: [
+                new OA\Property(property: 'title', type: 'string', example: 'Créer le CRUD Task'),
+                new OA\Property(property: 'description', type: 'string', nullable: true, example: 'Première tâche du projet'),
+                new OA\Property(property: 'dueAt', type: 'string', format: 'date', nullable: true, example: '2026-05-20'),
+                new OA\Property(property: 'priority', type: 'string', enum: ['low', 'medium', 'high'], example: 'high'),
+                new OA\Property(property: 'state', type: 'string', enum: ['open', 'in_progress', 'closed'], example: 'open'),
+                new OA\Property(property: 'assigneeId', type: 'integer', nullable: true, example: 1)
+            ]
+        )
+    )]
     #[Route('/projects/{id}/tasks', name: 'task_create', methods: ['POST'])]
     public function create(
         Project $project,
@@ -100,6 +149,21 @@ final class TaskController extends AbstractController
         return $this->json($this->formatTask($task), 201);
     }
 
+    #[OA\Get(
+        path: '/tasks/{id}',
+        summary: 'Get one task',
+        tags: ['Tasks'],
+        security: [['bearerAuth' => []]],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, description: 'Task ID', schema: new OA\Schema(type: 'integer'))
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Task details'),
+            new OA\Response(response: 401, description: 'Unauthorized'),
+            new OA\Response(response: 403, description: 'Access denied'),
+            new OA\Response(response: 404, description: 'Task not found')
+        ]
+    )]
     #[Route('/tasks/{id}', name: 'task_show', methods: ['GET'])]
     public function show(Task $task): JsonResponse
     {
@@ -108,6 +172,37 @@ final class TaskController extends AbstractController
         return $this->json($this->formatTask($task));
     }
 
+    #[OA\Patch(
+        path: '/tasks/{id}',
+        summary: 'Update a task',
+        tags: ['Tasks'],
+        security: [['bearerAuth' => []]],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, description: 'Task ID', schema: new OA\Schema(type: 'integer'))
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Task updated'),
+            new OA\Response(response: 400, description: 'Invalid payload'),
+            new OA\Response(response: 401, description: 'Unauthorized'),
+            new OA\Response(response: 403, description: 'Access denied'),
+            new OA\Response(response: 404, description: 'Task or assignee not found')
+        ]
+    )]
+    #[OA\RequestBody(
+        required: true,
+        description: 'Fields to update',
+        content: new OA\JsonContent(
+            type: 'object',
+            properties: [
+                new OA\Property(property: 'title', type: 'string', example: 'Créer le CRUD Task modifié'),
+                new OA\Property(property: 'description', type: 'string', nullable: true, example: 'Description mise à jour'),
+                new OA\Property(property: 'dueAt', type: 'string', format: 'date', nullable: true, example: '2026-05-25'),
+                new OA\Property(property: 'priority', type: 'string', enum: ['low', 'medium', 'high'], example: 'medium'),
+                new OA\Property(property: 'state', type: 'string', enum: ['open', 'in_progress', 'closed'], example: 'in_progress'),
+                new OA\Property(property: 'assigneeId', type: 'integer', nullable: true, example: 1)
+            ]
+        )
+    )]
     #[Route('/tasks/{id}', name: 'task_update', methods: ['PATCH'])]
     public function update(
         Task $task,
@@ -243,6 +338,21 @@ final class TaskController extends AbstractController
         return $this->json($this->formatTask($task));
     }
 
+    #[OA\Delete(
+        path: '/tasks/{id}',
+        summary: 'Delete a task',
+        tags: ['Tasks'],
+        security: [['bearerAuth' => []]],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, description: 'Task ID', schema: new OA\Schema(type: 'integer'))
+        ],
+        responses: [
+            new OA\Response(response: 204, description: 'Task deleted'),
+            new OA\Response(response: 401, description: 'Unauthorized'),
+            new OA\Response(response: 403, description: 'Access denied'),
+            new OA\Response(response: 404, description: 'Task not found')
+        ]
+    )]
     #[Route('/tasks/{id}', name: 'task_delete', methods: ['DELETE'])]
     public function delete(Task $task, EntityManagerInterface $entityManager): JsonResponse
     {
@@ -254,6 +364,21 @@ final class TaskController extends AbstractController
         return $this->json(null, 204);
     }
 
+    #[OA\Post(
+        path: '/tasks/{id}/close',
+        summary: 'Close a task',
+        tags: ['Tasks'],
+        security: [['bearerAuth' => []]],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, description: 'Task ID', schema: new OA\Schema(type: 'integer'))
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Task closed'),
+            new OA\Response(response: 401, description: 'Unauthorized'),
+            new OA\Response(response: 403, description: 'Access denied'),
+            new OA\Response(response: 404, description: 'Task not found')
+        ]
+    )]
     #[Route('/tasks/{id}/close', name: 'task_close', methods: ['POST'])]
     public function close(Task $task, EntityManagerInterface $entityManager): JsonResponse
     {
@@ -269,6 +394,21 @@ final class TaskController extends AbstractController
         return $this->json($this->formatTask($task));
     }
 
+    #[OA\Post(
+        path: '/tasks/{id}/open',
+        summary: 'Reopen a task',
+        tags: ['Tasks'],
+        security: [['bearerAuth' => []]],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, description: 'Task ID', schema: new OA\Schema(type: 'integer'))
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Task reopened'),
+            new OA\Response(response: 401, description: 'Unauthorized'),
+            new OA\Response(response: 403, description: 'Access denied'),
+            new OA\Response(response: 404, description: 'Task not found')
+        ]
+    )]
     #[Route('/tasks/{id}/open', name: 'task_open', methods: ['POST'])]
     public function open(Task $task, EntityManagerInterface $entityManager): JsonResponse
     {
