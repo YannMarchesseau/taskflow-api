@@ -5,6 +5,7 @@ namespace App\Controller;
 use App\Entity\Project;
 use App\Entity\User;
 use App\Repository\ProjectRepository;
+use App\Security\Voter\ProjectVoter;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -87,29 +88,82 @@ final class ProjectController extends AbstractController
     #[Route('/{id}', name: 'project_show', methods: ['GET'])]
     public function show(Project $project): JsonResponse
     {
-        /** @var User $user */
-        $user = $this->getUser();
-
-        if (!$this->canViewProject($project, $user)) {
-            return $this->json([
-                'message' => 'Access denied'
-            ], 403);
-        }
+        $this->denyAccessUnlessGranted(ProjectVoter::VIEW, $project);
 
         return $this->json($this->formatProject($project));
     }
 
-    private function canViewProject(Project $project, User $user): bool
+    #[Route('/{id}', name: 'project_update', methods: ['PATCH'])]
+    public function update(Project $project, Request $request, EntityManagerInterface $entityManager): JsonResponse
     {
-        if (in_array('ROLE_MANAGER', $user->getRoles(), true)) {
-            return true;
+        $this->denyAccessUnlessGranted(ProjectVoter::EDIT, $project);
+
+        $data = json_decode($request->getContent(), true);
+
+        if (!$data) {
+            return $this->json([
+                'message' => 'Invalid JSON payload'
+            ], 400);
         }
 
-        if ($project->getOwner() === $user) {
-            return true;
+        if (array_key_exists('title', $data)) {
+            if (empty($data['title'])) {
+                return $this->json([
+                    'message' => 'Title cannot be empty'
+                ], 400);
+            }
+
+            $project->setTitle($data['title']);
         }
 
-        return $project->getMembers()->contains($user);
+        if (array_key_exists('description', $data)) {
+            $project->setDescription($data['description']);
+        }
+
+        if (array_key_exists('status', $data)) {
+            if (!in_array($data['status'], ['active', 'archived'], true)) {
+                return $this->json([
+                    'message' => 'Invalid status'
+                ], 400);
+            }
+
+            $project->setStatus($data['status']);
+        }
+
+        try {
+            if (array_key_exists('startAt', $data)) {
+                $project->setStartAt(new \DateTimeImmutable($data['startAt']));
+            }
+
+            if (array_key_exists('endAt', $data)) {
+                $project->setEndAt(!empty($data['endAt']) ? new \DateTimeImmutable($data['endAt']) : null);
+            }
+        } catch (\Exception) {
+            return $this->json([
+                'message' => 'Invalid date format'
+            ], 400);
+        }
+
+        if ($project->getEndAt() !== null && $project->getEndAt() < $project->getStartAt()) {
+            return $this->json([
+                'message' => 'endAt must be greater than or equal to startAt'
+            ], 400);
+        }
+
+        $entityManager->flush();
+
+        return $this->json($this->formatProject($project));
+    }
+
+    #[Route('/{id}', name: 'project_delete', methods: ['DELETE'])]
+    public function delete(Project $project, EntityManagerInterface $entityManager): JsonResponse
+    {
+        $this->denyAccessUnlessGranted(ProjectVoter::DELETE, $project);
+
+        $entityManager->remove($project);
+        $entityManager->flush();
+
+        return $this->json(null, 204);
     }
 
     private function formatProject(Project $project): array
