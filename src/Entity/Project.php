@@ -47,10 +47,17 @@ class Project
     #[ORM\OneToMany(targetEntity: Tag::class, mappedBy: 'project')]
     private Collection $tags;
 
+    /**
+     * @var Collection<int, Task>
+     */
+    #[ORM\OneToMany(targetEntity: Task::class, mappedBy: 'project')]
+    private Collection $tasks;
+
     public function __construct()
     {
         $this->members = new ArrayCollection();
         $this->tags = new ArrayCollection();
+        $this->tasks = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -174,12 +181,32 @@ class Project
 
     public function removeTag(Tag $tag): static
     {
-        if ($this->tags->removeElement($tag)) {
-            // set the owning side to null (unless already changed)
-            if ($tag->getProject() === $this) {
-                $tag->setProject(null);
-            }
+        $this->tags->removeElement($tag);
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, Task>
+     */
+    public function getTasks(): Collection
+    {
+        return $this->tasks;
+    }
+
+    public function addTask(Task $task): static
+    {
+        if (!$this->tasks->contains($task)) {
+            $this->tasks->add($task);
+            $task->setProject($this);
         }
+
+        return $this;
+    }
+
+    public function removeTask(Task $task): static
+    {
+        $this->tasks->removeElement($task);
 
         return $this;
     }
