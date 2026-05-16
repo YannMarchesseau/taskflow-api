@@ -171,5 +171,5 @@ php bin/phpunit
 ---
 
 # Auteur
-
+Yann Marchesseau
 Projet réalisé dans le cadre d'un workshop Leaning Campus "Développer une application mobile sécurisée avec SWIFT et SWIFTUI" T.
