@@ -13,7 +13,6 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
-#[OA\Tag(name: 'Authentication')]
 final class AuthController extends AbstractController
 {
     #[OA\Post(
@@ -119,6 +118,7 @@ final class AuthController extends AbstractController
         path: '/me',
         summary: 'Get current authenticated user profile',
         security: [['bearerAuth' => []]],
+        tags: ['Authentication'],
         responses: [
             new OA\Response(
                 response: 200,
