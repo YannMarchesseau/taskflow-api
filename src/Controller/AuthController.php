@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\User;
+use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -18,29 +19,34 @@ final class AuthController extends AbstractController
     #[OA\Post(
         path: '/auth/register',
         summary: 'Register a new user',
-        requestBody: new OA\RequestBody(
-            required: true,
-            content: new OA\JsonContent(
-                required: ['email', 'password', 'firstName', 'lastName'],
-                properties: [
-                    new OA\Property(property: 'email', type: 'string', example: 'test@test.com'),
-                    new OA\Property(property: 'password', type: 'string', example: 'Password123!'),
-                    new OA\Property(property: 'firstName', type: 'string', example: 'Yann'),
-                    new OA\Property(property: 'lastName', type: 'string', example: 'Test'),
-                ]
-            )
-        ),
+        tags: ['Authentication'],
         responses: [
             new OA\Response(response: 201, description: 'User registered successfully'),
             new OA\Response(response: 400, description: 'Invalid payload or validation failed')
         ]
+    )]
+    #[OA\RequestBody(
+        required: true,
+        description: 'User registration payload',
+        content: new OA\JsonContent(
+            type: 'object',
+            required: ['email', 'password', 'firstName', 'lastName'],
+            properties: [
+                new OA\Property(property: 'email', type: 'string', example: 'test@test.com'),
+                new OA\Property(property: 'password', type: 'string', example: 'Password123!'),
+                new OA\Property(property: 'firstName', type: 'string', example: 'Yann'),
+                new OA\Property(property: 'lastName', type: 'string', example: 'Test'),
+                new OA\Property(property: 'role', type: 'string', enum: ['ROLE_USER', 'ROLE_MANAGER'], example: 'ROLE_USER')
+            ]
+        )
     )]
     #[Route('/auth/register', name: 'auth_register', methods: ['POST'])]
     public function register(
         Request $request,
         EntityManagerInterface $entityManager,
         UserPasswordHasherInterface $passwordHasher,
-        ValidatorInterface $validator
+        ValidatorInterface $validator,
+        UserRepository $userRepository
     ): JsonResponse {
         $data = json_decode($request->getContent(), true);
 
@@ -50,16 +56,37 @@ final class AuthController extends AbstractController
             ], 400);
         }
 
+        $email = trim((string) ($data['email'] ?? ''));
+        $password = (string) ($data['password'] ?? '');
+        $role = $data['role'] ?? 'ROLE_USER';
+
+        if (!in_array($role, ['ROLE_USER', 'ROLE_MANAGER'], true)) {
+            return $this->json([
+                'message' => 'Invalid role. Allowed roles are ROLE_USER and ROLE_MANAGER.'
+            ], 400);
+        }
+
+        if ($email !== '' && $userRepository->findOneBy(['email' => $email]) instanceof User) {
+            return $this->json([
+                'message' => 'Email already exists'
+            ], 409);
+        }
+
+        if (strlen($password) < 8) {
+            return $this->json([
+                'message' => 'Password must contain at least 8 characters'
+            ], 400);
+        }
+
         $user = new User();
-        $user->setEmail($data['email'] ?? '');
-        $user->setFirstName($data['firstName'] ?? '');
-        $user->setLastName($data['lastName'] ?? '');
-        $user->setRoles(['ROLE_USER']);
-        $user->setCreatedAt(new \DateTimeImmutable());
+        $user->setEmail($email);
+        $user->setFirstName(trim((string) ($data['firstName'] ?? '')));
+        $user->setLastName(trim((string) ($data['lastName'] ?? '')));
+        $user->setRoles([$role]);
 
         $hashedPassword = $passwordHasher->hashPassword(
             $user,
-            $data['password'] ?? ''
+            $password
         );
 
         $user->setPassword($hashedPassword);
@@ -83,7 +110,8 @@ final class AuthController extends AbstractController
         $entityManager->flush();
 
         return $this->json([
-            'message' => 'User registered successfully'
+            'message' => 'User registered successfully',
+            'user' => $this->formatUser($user),
         ], 201);
     }
 
@@ -119,12 +147,19 @@ final class AuthController extends AbstractController
             ], 401);
         }
 
-        return $this->json([
+        return $this->json($this->formatUser($user));
+    }
+
+
+    private function formatUser(User $user): array
+    {
+        return [
             'id' => $user->getId(),
             'email' => $user->getUserIdentifier(),
             'firstName' => $user->getFirstName(),
             'lastName' => $user->getLastName(),
             'roles' => $user->getRoles(),
-        ]);
+            'createdAt' => $user->getCreatedAt()?->format(DATE_ATOM),
+        ];
     }
 }
