@@ -151,6 +151,173 @@ final class AuthController extends AbstractController
     }
 
 
+    #[OA\Get(
+        path: '/users',
+        summary: 'List users',
+        security: [['bearerAuth' => []]],
+        tags: ['Users'],
+        responses: [
+            new OA\Response(response: 200, description: 'Users list'),
+            new OA\Response(response: 401, description: 'Unauthorized'),
+            new OA\Response(response: 403, description: 'Access denied')
+        ]
+    )]
+    #[Route('/users', name: 'user_index', methods: ['GET'])]
+    public function users(UserRepository $userRepository): JsonResponse
+    {
+        $currentUser = $this->getUser();
+
+        if (!$currentUser instanceof User) {
+            return $this->json([
+                'message' => 'Unauthorized'
+            ], 401);
+        }
+
+        if (!$currentUser->isManager()) {
+            return $this->json([
+                'message' => 'Access denied'
+            ], 403);
+        }
+
+        $users = $userRepository->findBy([], ['email' => 'ASC']);
+
+        return $this->json(array_map([$this, 'formatUser'], $users));
+    }
+
+    #[OA\Patch(
+        path: '/users/{id}/role',
+        summary: 'Update user role',
+        security: [['bearerAuth' => []]],
+        tags: ['Users'],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'User role updated'),
+            new OA\Response(response: 400, description: 'Invalid payload'),
+            new OA\Response(response: 401, description: 'Unauthorized'),
+            new OA\Response(response: 403, description: 'Access denied'),
+            new OA\Response(response: 404, description: 'User not found')
+        ]
+    )]
+    #[OA\RequestBody(
+        required: true,
+        description: 'Role update payload',
+        content: new OA\JsonContent(
+            type: 'object',
+            required: ['role'],
+            properties: [
+                new OA\Property(property: 'role', type: 'string', enum: ['ROLE_USER', 'ROLE_MANAGER'], example: 'ROLE_MANAGER')
+            ]
+        )
+    )]
+    #[Route('/users/{id}/role', name: 'user_update_role', methods: ['PATCH'])]
+    public function updateUserRole(
+        int $id,
+        Request $request,
+        UserRepository $userRepository,
+        EntityManagerInterface $entityManager
+    ): JsonResponse {
+        $currentUser = $this->getUser();
+
+        if (!$currentUser instanceof User) {
+            return $this->json([
+                'message' => 'Unauthorized'
+            ], 401);
+        }
+
+        if (!$currentUser->isManager()) {
+            return $this->json([
+                'message' => 'Access denied'
+            ], 403);
+        }
+
+        $user = $userRepository->find($id);
+
+        if (!$user instanceof User) {
+            return $this->json([
+                'message' => 'User not found'
+            ], 404);
+        }
+
+        $data = json_decode($request->getContent(), true);
+
+        if (!is_array($data) || empty($data['role'])) {
+            return $this->json([
+                'message' => 'Missing required field: role'
+            ], 400);
+        }
+
+        $role = $data['role'];
+
+        if (!in_array($role, ['ROLE_USER', 'ROLE_MANAGER'], true)) {
+            return $this->json([
+                'message' => 'Invalid role. Allowed roles are ROLE_USER and ROLE_MANAGER.'
+            ], 400);
+        }
+
+        $user->setRoles([$role]);
+        $entityManager->flush();
+
+        return $this->json($this->formatUser($user));
+    }
+
+    #[OA\Delete(
+        path: '/users/{id}',
+        summary: 'Delete a user',
+        security: [['bearerAuth' => []]],
+        tags: ['Users'],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))
+        ],
+        responses: [
+            new OA\Response(response: 204, description: 'User deleted'),
+            new OA\Response(response: 400, description: 'Invalid operation'),
+            new OA\Response(response: 401, description: 'Unauthorized'),
+            new OA\Response(response: 403, description: 'Access denied'),
+            new OA\Response(response: 404, description: 'User not found')
+        ]
+    )]
+    #[Route('/users/{id}', name: 'user_delete', methods: ['DELETE'])]
+    public function deleteUser(
+        int $id,
+        UserRepository $userRepository,
+        EntityManagerInterface $entityManager
+    ): JsonResponse {
+        $currentUser = $this->getUser();
+
+        if (!$currentUser instanceof User) {
+            return $this->json([
+                'message' => 'Unauthorized'
+            ], 401);
+        }
+
+        if (!$currentUser->isManager()) {
+            return $this->json([
+                'message' => 'Access denied'
+            ], 403);
+        }
+
+        $user = $userRepository->find($id);
+
+        if (!$user instanceof User) {
+            return $this->json([
+                'message' => 'User not found'
+            ], 404);
+        }
+
+        if ($currentUser->getId() === $user->getId()) {
+            return $this->json([
+                'message' => 'You cannot delete your own account'
+            ], 400);
+        }
+
+        $entityManager->remove($user);
+        $entityManager->flush();
+
+        return $this->json(null, 204);
+    }
+
     private function formatUser(User $user): array
     {
         return [
