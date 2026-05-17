@@ -219,7 +219,51 @@ GET /me
 
 
 ---
+# Users
 
+## Gestion utilisateurs
+
+- `GET /users`
+- `PATCH /users/{id}/role`
+- `DELETE /users/{id}`
+
+Permissions :
+* ROLE_MANAGER
+
+---
+
+## Lister les utilisateurs
+```http
+GET /users
+```
+## Modifier un rôle utilisateur
+```http
+PATCH /users/{id}/role
+```
+Payload :
+```json
+{
+  "role": "ROLE_MANAGER"
+}
+```
+Rôles disponibles :
+* ROLE_USER
+* ROLE_MANAGER
+
+Permissions :
+* ROLE_MANAGER
+
+ ## Supprimer un utilisateur
+```http
+DELETE /users/{id}
+```
+Permissions :
+* ROLE_MANAGER
+
+Restrictions :
+* un manager ne peut pas supprimer son propre compte
+  
+---
 # Projects
 
 ## Gestion projets
