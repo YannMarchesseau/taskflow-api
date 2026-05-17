@@ -5,6 +5,7 @@ namespace App\Controller;
 use App\Entity\Project;
 use App\Entity\User;
 use App\Repository\ProjectRepository;
+use App\Repository\UserRepository;
 use App\Security\Voter\ProjectVoter;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
@@ -261,6 +262,161 @@ final class ProjectController extends AbstractController
         return $this->json(null, 204);
     }
 
+    #[OA\Get(
+        path: '/projects/{id}/members',
+        summary: 'List members of a project',
+        security: [['bearerAuth' => []]],
+        tags: ['Projects'],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Project members list'),
+            new OA\Response(response: 401, description: 'Unauthorized'),
+            new OA\Response(response: 403, description: 'Access denied'),
+            new OA\Response(response: 404, description: 'Project not found')
+        ]
+    )]
+    #[Route('/{id}/members', name: 'project_members', methods: ['GET'])]
+    public function members(Project $project): JsonResponse
+    {
+        $this->denyAccessUnlessGranted(ProjectVoter::VIEW, $project);
+
+        return $this->json(array_map([$this, 'formatUser'], $project->getMembers()->toArray()));
+    }
+
+    #[OA\Post(
+        path: '/projects/{id}/members',
+        summary: 'Add a member to a project',
+        security: [['bearerAuth' => []]],
+        tags: ['Projects'],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Member added'),
+            new OA\Response(response: 400, description: 'Invalid payload'),
+            new OA\Response(response: 401, description: 'Unauthorized'),
+            new OA\Response(response: 403, description: 'Access denied'),
+            new OA\Response(response: 404, description: 'Project or user not found')
+        ]
+    )]
+    #[OA\RequestBody(
+        required: true,
+        description: 'Member to add. Provide either userId or email.',
+        content: new OA\JsonContent(
+            type: 'object',
+            properties: [
+                new OA\Property(property: 'userId', type: 'integer', nullable: true, example: 3),
+                new OA\Property(property: 'email', type: 'string', nullable: true, example: 'member@taskflow.test')
+            ]
+        )
+    )]
+    #[Route('/{id}/members', name: 'project_member_add', methods: ['POST'])]
+    public function addMember(
+        Project $project,
+        Request $request,
+        UserRepository $userRepository,
+        EntityManagerInterface $entityManager
+    ): JsonResponse {
+        $this->denyAccessUnlessGranted(ProjectVoter::EDIT, $project);
+
+        $data = json_decode($request->getContent(), true);
+
+        if (!$data) {
+            return $this->json([
+                'message' => 'Invalid JSON payload'
+            ], 400);
+        }
+
+        $member = null;
+
+        if (!empty($data['userId'])) {
+            $member = $userRepository->find((int) $data['userId']);
+        } elseif (!empty($data['email'])) {
+            $member = $userRepository->findOneBy(['email' => $data['email']]);
+        }
+
+        if (!$member instanceof User) {
+            return $this->json([
+                'message' => 'User not found'
+            ], 404);
+        }
+
+        if ($project->getMembers()->contains($member)) {
+            return $this->json([
+                'message' => 'User is already a project member'
+            ], 400);
+        }
+
+        $project->addMember($member);
+        $entityManager->flush();
+
+        return $this->json($this->formatProject($project));
+    }
+
+    #[OA\Delete(
+        path: '/projects/{id}/members/{userId}',
+        summary: 'Remove a member from a project',
+        security: [['bearerAuth' => []]],
+        tags: ['Projects'],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: 'userId', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))
+        ],
+        responses: [
+            new OA\Response(response: 204, description: 'Member removed'),
+            new OA\Response(response: 400, description: 'Invalid operation'),
+            new OA\Response(response: 401, description: 'Unauthorized'),
+            new OA\Response(response: 403, description: 'Access denied'),
+            new OA\Response(response: 404, description: 'Project or user not found')
+        ]
+    )]
+    #[Route('/{id}/members/{userId}', name: 'project_member_remove', methods: ['DELETE'])]
+    public function removeMember(
+        Project $project,
+        int $userId,
+        UserRepository $userRepository,
+        EntityManagerInterface $entityManager
+    ): JsonResponse {
+        $this->denyAccessUnlessGranted(ProjectVoter::EDIT, $project);
+
+        $member = $userRepository->find($userId);
+
+        if (!$member instanceof User) {
+            return $this->json([
+                'message' => 'User not found'
+            ], 404);
+        }
+
+        if ($project->getOwner() === $member) {
+            return $this->json([
+                'message' => 'Project owner cannot be removed from members'
+            ], 400);
+        }
+
+        if (!$project->getMembers()->contains($member)) {
+            return $this->json([
+                'message' => 'User is not a project member'
+            ], 400);
+        }
+
+        $project->removeMember($member);
+        $entityManager->flush();
+
+        return $this->json(null, 204);
+    }
+
+    private function formatUser(User $user): array
+    {
+        return [
+            'id' => $user->getId(),
+            'email' => $user->getEmail(),
+            'firstName' => $user->getFirstName(),
+            'lastName' => $user->getLastName(),
+        ];
+    }
+
     private function formatProject(Project $project): array
     {
         return [
@@ -270,18 +426,8 @@ final class ProjectController extends AbstractController
             'startAt' => $project->getStartAt()?->format('Y-m-d'),
             'endAt' => $project->getEndAt()?->format('Y-m-d'),
             'status' => $project->getStatus(),
-            'owner' => [
-                'id' => $project->getOwner()->getId(),
-                'email' => $project->getOwner()->getEmail(),
-                'firstName' => $project->getOwner()->getFirstName(),
-                'lastName' => $project->getOwner()->getLastName(),
-            ],
-            'members' => array_map(static fn (User $member) => [
-                'id' => $member->getId(),
-                'email' => $member->getEmail(),
-                'firstName' => $member->getFirstName(),
-                'lastName' => $member->getLastName(),
-            ], $project->getMembers()->toArray()),
+            'owner' => $this->formatUser($project->getOwner()),
+            'members' => array_map([$this, 'formatUser'], $project->getMembers()->toArray()),
         ];
     }
 }
