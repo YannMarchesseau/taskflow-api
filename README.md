@@ -215,8 +215,8 @@ GET /me
 ---
 
 # Endpoints principaux
+<img width="895" height="1057" alt="TaskFlow-API" src="https://github.com/user-attachments/assets/4e32f6fd-2b5e-4e14-b9a7-7cc9127d0be6" />
 
-<img width="1843" height="1414" alt="taskFlowAPIdoc" src="https://github.com/user-attachments/assets/578b65e5-eb74-4a6a-8505-084e3a04b250" />
 
 ---
 
