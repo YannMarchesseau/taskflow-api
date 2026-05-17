@@ -4,20 +4,73 @@ API REST sécurisée développée avec Symfony dans le cadre du workshop :
 
 > Développer une application mobile sécurisée avec Swift et SwiftUI
 
-L’API permet la gestion de projets collaboratifs, tâches, membres et tags avec authentification JWT.
+L’API permet la gestion collaborative de projets, tâches, membres et tags avec authentification JWT et contrôle d’accès avancé.
 
 ---
 
 # Stack technique
 
-- Symfony 7
 - PHP 8.3
-- MariaDB / MySQL
+- Symfony 7
 - Doctrine ORM
-- JWT (LexikJWTAuthenticationBundle)
-- NelmioApiDocBundle / OpenAPI
+- MariaDB / MySQL
+- JWT Authentication
+- NelmioApiDocBundle / Swagger
+- PHPUnit
+- Monolog
 - Voters Symfony
-- API REST JSON
+
+---
+
+# Fonctionnalités
+
+## Authentification
+
+- Inscription utilisateur
+- Connexion JWT
+- Endpoint `/me`
+- Gestion des rôles :
+  - `ROLE_USER`
+  - `ROLE_MANAGER`
+
+---
+
+## Projets
+
+- CRUD projets
+- Gestion des membres
+- Contrôle d’accès par projet
+- Statuts :
+  - `active`
+  - `archived`
+
+---
+
+## Tâches
+
+- CRUD tâches
+- Assignation utilisateur
+- États :
+  - `open`
+  - `in_progress`
+  - `closed`
+- Priorités :
+  - `low`
+  - `medium`
+  - `high`
+- Filtres :
+  - état
+  - priorité
+  - assigné
+  - tag
+- Pagination
+
+---
+
+## Tags
+
+- CRUD tags
+- Association / dissociation avec tâches
 
 ---
 
@@ -42,7 +95,7 @@ composer install
 
 # Configuration
 
-Créer un fichier `.env.local` :
+Créer un fichier `.env.local`
 
 ```env
 DATABASE_URL="mysql://USER:PASSWORD@127.0.0.1:3306/taskflow_api?serverVersion=10.11.2-MariaDB&charset=utf8mb4"
@@ -118,10 +171,11 @@ Payload exemple :
 
 ```json
 {
-  "email": "test@test.com",
+  "email": "manager@test.com",
   "password": "Password123!",
   "firstName": "Yann",
-  "lastName": "Test"
+  "lastName": "Manager",
+  "role": "ROLE_MANAGER"
 }
 ```
 
@@ -133,11 +187,11 @@ Payload exemple :
 POST /auth/login
 ```
 
-Payload exemple :
+Payload :
 
 ```json
 {
-  "email": "test@test.com",
+  "email": "manager@test.com",
   "password": "Password123!"
 }
 ```
@@ -152,15 +206,23 @@ Réponse :
 
 ---
 
-# Endpoints principaux
-<img width="895" height="1057" alt="TaskFlow-API" src="https://github.com/user-attachments/assets/bf0e029f-6924-40cf-8e57-fc1d9259e166" />
+## Profil utilisateur courant
 
+```http
+GET /me
+```
+
+---
+
+# Endpoints principaux
+
+<img width="1843" height="1414" alt="taskFlowAPIdoc" src="https://github.com/user-attachments/assets/578b65e5-eb74-4a6a-8505-084e3a04b250" />
 
 ---
 
 # Projects
 
-## Gestion des projets
+## Gestion projets
 
 - `GET /projects`
 - `POST /projects`
@@ -168,17 +230,33 @@ Réponse :
 - `PATCH /projects/{id}`
 - `DELETE /projects/{id}`
 
-## Gestion des membres
+## Membres projet
 
 - `GET /projects/{id}/members`
 - `POST /projects/{id}/members`
 - `DELETE /projects/{id}/members/{userId}`
 
+Payload exemple :
+
+```json
+{
+  "email": "member@test.com"
+}
+```
+
+ou :
+
+```json
+{
+  "userId": 3
+}
+```
+
 ---
 
 # Tasks
 
-## Gestion des tâches
+## Gestion tâches
 
 - `GET /projects/{id}/tasks`
 - `POST /projects/{id}/tasks`
@@ -186,16 +264,20 @@ Réponse :
 - `PATCH /tasks/{id}`
 - `DELETE /tasks/{id}`
 
-## États des tâches
+---
+
+## Changement d’état
 
 - `POST /tasks/{id}/close`
 - `POST /tasks/{id}/open`
+
+---
 
 ## Assignation
 
 - `PATCH /tasks/{id}/assign`
 
-Payload exemple :
+Payload :
 
 ```json
 {
@@ -203,7 +285,7 @@ Payload exemple :
 }
 ```
 
-Pour retirer une assignation :
+Retirer une assignation :
 
 ```json
 {
@@ -213,16 +295,33 @@ Pour retirer une assignation :
 
 ---
 
+## Filtres disponibles
+
+```http
+GET /projects/{id}/tasks?state=open
+GET /projects/{id}/tasks?priority=high
+GET /projects/{id}/tasks?assigneeId=3
+GET /projects/{id}/tasks?tagId=5
+```
+
+Pagination :
+
+```http
+GET /projects/{id}/tasks?page=1&limit=20
+```
+
+---
+
 # Tags
 
-## Gestion des tags
+## Gestion tags
 
 - `GET /projects/{id}/tags`
 - `POST /projects/{id}/tags`
 - `PATCH /tags/{id}`
 - `DELETE /tags/{id}`
 
-## Association tags / tâches
+## Association tag ↔ tâche
 
 - `POST /tasks/{id}/tags/{tagId}`
 - `DELETE /tasks/{id}/tags/{tagId}`
@@ -231,13 +330,29 @@ Pour retirer une assignation :
 
 # Sécurité
 
-- Authentification JWT
-- Stockage sécurisé des mots de passe
-- Contrôle d’accès via Voters Symfony
-- Permissions par projet
+- JWT Authentication
+- Password hashing
+- Symfony Voters
+- Contrôle d’accès par projet
+- Contrôle d’accès par tâche
 - Validation des payloads
 - Gestion des erreurs HTTP
-- Routes protégées
+- Protection des routes API
+
+---
+
+# Autorisations
+
+| Action | ROLE_USER | ROLE_MANAGER |
+|---|---|---|
+| Voir projet membre | ✅ | ✅ |
+| Créer projet | ✅ | ✅ |
+| Modifier projet propriétaire | ✅ | ✅ |
+| Gérer membres | propriétaire | ✅ |
+| Créer tâche | propriétaire | ✅ |
+| Modifier tâche assignée | ✅ | ✅ |
+| Supprimer tâche | propriétaire | ✅ |
+| Clore / rouvrir tâche assignée | ✅ | ✅ |
 
 ---
 
@@ -273,10 +388,19 @@ JWT_PASSPHRASE=
 
 ---
 
+# Workflow Git
+
+- Branche `main`
+- Branches `feature/...`
+- Pull Requests
+- Commits conventionnels
+
+---
+
 # Auteur
 
 Yann Marchesseau
 
-Projet réalisé dans le cadre du workshop Learning Campus :
+Projet réalisé dans le cadre du workshop :
 
 > Développer une application mobile sécurisée avec Swift et SwiftUI
