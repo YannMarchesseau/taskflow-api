@@ -357,7 +357,7 @@ final class ProjectController extends AbstractController
 
     #[OA\Delete(
         path: '/projects/{id}/members/{userId}',
-        summary: 'Remove a member from a project',
+        summary: 'Remove a member from a project and unassign their project tasks',
         security: [['bearerAuth' => []]],
         tags: ['Projects'],
         parameters: [
@@ -399,6 +399,12 @@ final class ProjectController extends AbstractController
             return $this->json([
                 'message' => 'User is not a project member'
             ], 400);
+        }
+
+        foreach ($project->getTasks() as $task) {
+            if ($task->getAssignee() === $member) {
+                $task->setAssignee(null);
+            }
         }
 
         $project->removeMember($member);
