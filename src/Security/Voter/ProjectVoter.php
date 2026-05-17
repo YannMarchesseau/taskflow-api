@@ -40,7 +40,7 @@ final class ProjectVoter extends Voter
         /** @var Project $project */
         $project = $subject;
 
-        if (in_array('ROLE_MANAGER', $user->getRoles(), true)) {
+        if ($user->isManager()) {
             return true;
         }
 
@@ -56,11 +56,11 @@ final class ProjectVoter extends Voter
 
     private function canView(Project $project, User $user): bool
     {
-        return $this->isOwner($project, $user) || $project->getMembers()->contains($user);
+        return $project->hasMember($user);
     }
 
     private function isOwner(Project $project, User $user): bool
     {
-        return $project->getOwner() === $user;
+        return $project->isOwner($user);
     }
 }

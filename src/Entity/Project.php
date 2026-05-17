@@ -53,11 +53,16 @@ class Project
     #[ORM\OneToMany(targetEntity: Task::class, mappedBy: 'project')]
     private Collection $tasks;
 
+    public const STATUS_ACTIVE = 'active';
+    public const STATUS_ARCHIVED = 'archived';
+
     public function __construct()
     {
         $this->members = new ArrayCollection();
         $this->tags = new ArrayCollection();
         $this->tasks = new ArrayCollection();
+        $this->startAt = new \DateTimeImmutable();
+        $this->status = self::STATUS_ACTIVE;
     }
 
     public function getId(): ?int
@@ -120,6 +125,10 @@ class Project
 
     public function setStatus(string $status): static
     {
+        if (!in_array($status, [self::STATUS_ACTIVE, self::STATUS_ARCHIVED], true)) {
+            throw new \InvalidArgumentException('Invalid project status.');
+        }
+
         $this->status = $status;
 
         return $this;
@@ -134,7 +143,26 @@ class Project
     {
         $this->owner = $owner;
 
+        if ($owner instanceof User) {
+            $this->addMember($owner);
+        }
+
         return $this;
+    }
+
+    public function isOwner(User $user): bool
+    {
+        return $this->owner === $user;
+    }
+
+    public function hasMember(User $user): bool
+    {
+        return $this->members->contains($user) || $this->isOwner($user);
+    }
+
+    public function canManageMembers(User $user): bool
+    {
+        return $this->isOwner($user) || $user->isManager();
     }
 
     /**

@@ -37,35 +37,24 @@ final class TaskVoter extends Voter
 
         /** @var Task $task */
         $task = $subject;
-        $project = $task->getProject();
 
-        if (in_array('ROLE_MANAGER', $user->getRoles(), true)) {
+        if ($user->isManager()) {
             return true;
         }
 
         return match ($attribute) {
-            self::VIEW => $this->isProjectMemberOrOwner($task, $user),
-            self::EDIT => $this->isProjectOwner($task, $user) || $this->isAssignee($task, $user),
-            self::DELETE => $this->isProjectOwner($task, $user),
-            self::CHANGE_STATE => $this->isProjectOwner($task, $user) || $this->isAssignee($task, $user),
+            self::VIEW => $this->canView($task, $user),
+            self::EDIT => $task->canBeManagedBy($user) || $task->isAssignedTo($user),
+            self::DELETE => $task->canBeManagedBy($user),
+            self::CHANGE_STATE => $task->canStateBeChangedBy($user),
             default => false,
         };
     }
 
-    private function isProjectMemberOrOwner(Task $task, User $user): bool
+    private function canView(Task $task, User $user): bool
     {
         $project = $task->getProject();
 
-        return $project->getOwner() === $user || $project->getMembers()->contains($user);
-    }
-
-    private function isProjectOwner(Task $task, User $user): bool
-    {
-        return $task->getProject()->getOwner() === $user;
-    }
-
-    private function isAssignee(Task $task, User $user): bool
-    {
-        return $task->getAssignee() === $user;
+        return $project !== null && $project->hasMember($user);
     }
 }

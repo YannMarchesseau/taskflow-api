@@ -11,6 +11,14 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Entity(repositoryClass: TaskRepository::class)]
 class Task
 {
+    public const PRIORITY_LOW = 'low';
+    public const PRIORITY_MEDIUM = 'medium';
+    public const PRIORITY_HIGH = 'high';
+
+    public const STATE_OPEN = 'open';
+    public const STATE_IN_PROGRESS = 'in_progress';
+    public const STATE_CLOSED = 'closed';
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
@@ -47,6 +55,8 @@ class Task
     public function __construct()
     {
         $this->tags = new ArrayCollection();
+        $this->priority = self::PRIORITY_MEDIUM;
+        $this->state = self::STATE_OPEN;
     }
 
     public function getId(): ?int
@@ -97,6 +107,10 @@ class Task
 
     public function setPriority(string $priority): static
     {
+        if (!in_array($priority, [self::PRIORITY_LOW, self::PRIORITY_MEDIUM, self::PRIORITY_HIGH], true)) {
+            throw new \InvalidArgumentException('Invalid task priority.');
+        }
+
         $this->priority = $priority;
 
         return $this;
@@ -109,9 +123,30 @@ class Task
 
     public function setState(string $state): static
     {
+        if (!in_array($state, [self::STATE_OPEN, self::STATE_IN_PROGRESS, self::STATE_CLOSED], true)) {
+            throw new \InvalidArgumentException('Invalid task state.');
+        }
+
         $this->state = $state;
 
         return $this;
+    }
+
+    public function isAssignedTo(User $user): bool
+    {
+        return $this->assignee === $user;
+    }
+
+    public function canBeManagedBy(User $user): bool
+    {
+        $project = $this->getProject();
+
+        return $project instanceof Project && ($project->isOwner($user) || $user->isManager());
+    }
+
+    public function canStateBeChangedBy(User $user): bool
+    {
+        return $this->isAssignedTo($user) || $this->canBeManagedBy($user);
     }
 
     public function getProject(): ?Project

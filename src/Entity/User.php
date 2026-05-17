@@ -66,6 +66,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         $this->projects = new ArrayCollection();
         $this->memberProjects = new ArrayCollection();
         $this->assignedTasks = new ArrayCollection();
+        $this->createdAt = new \DateTimeImmutable();
     }
 
     public function getId(): ?int
@@ -112,9 +113,14 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
      */
     public function setRoles(array $roles): static
     {
-        $this->roles = $roles;
+        $this->roles = array_values(array_unique($roles));
 
         return $this;
+    }
+
+    public function isManager(): bool
+    {
+        return in_array('ROLE_MANAGER', $this->getRoles(), true);
     }
 
     /**
