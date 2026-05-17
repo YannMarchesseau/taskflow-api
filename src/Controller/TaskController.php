@@ -338,6 +338,85 @@ final class TaskController extends AbstractController
         return $this->json($this->formatTask($task));
     }
 
+    #[OA\Patch(
+        path: '/tasks/{id}/assign',
+        summary: 'Assign a task to a project member',
+        tags: ['Tasks'],
+        security: [['bearerAuth' => []]],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, description: 'Task ID', schema: new OA\Schema(type: 'integer'))
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Task assigned'),
+            new OA\Response(response: 400, description: 'Invalid payload'),
+            new OA\Response(response: 401, description: 'Unauthorized'),
+            new OA\Response(response: 403, description: 'Access denied'),
+            new OA\Response(response: 404, description: 'Task or assignee not found')
+        ]
+    )]
+    #[OA\RequestBody(
+        required: true,
+        description: 'Assignee data. Send null to remove assignee.',
+        content: new OA\JsonContent(
+            type: 'object',
+            required: ['assigneeId'],
+            properties: [
+                new OA\Property(property: 'assigneeId', type: 'integer', nullable: true, example: 3)
+            ]
+        )
+    )]
+    #[Route('/tasks/{id}/assign', name: 'task_assign', methods: ['PATCH'])]
+    public function assign(
+        Task $task,
+        Request $request,
+        EntityManagerInterface $entityManager,
+        UserRepository $userRepository
+    ): JsonResponse {
+        /** @var User $user */
+        $user = $this->getUser();
+        $project = $task->getProject();
+
+        $isManager = in_array('ROLE_MANAGER', $user->getRoles(), true);
+        $isOwner = $project->getOwner() === $user;
+
+        if (!$isManager && !$isOwner) {
+            return $this->json([
+                'message' => 'Only the project owner can update the assignee'
+            ], 403);
+        }
+
+        $data = json_decode($request->getContent(), true);
+
+        if (!is_array($data) || !array_key_exists('assigneeId', $data)) {
+            return $this->json([
+                'message' => 'Missing required field: assigneeId'
+            ], 400);
+        }
+
+        $assignee = null;
+
+        if (!empty($data['assigneeId'])) {
+            $assignee = $userRepository->find((int) $data['assigneeId']);
+
+            if (!$assignee instanceof User) {
+                return $this->json([
+                    'message' => 'Assignee not found'
+                ], 404);
+            }
+
+            if (!$project->getMembers()->contains($assignee) && $project->getOwner() !== $assignee) {
+                return $this->json([
+                    'message' => 'Assignee must be a project member'
+                ], 400);
+            }
+        }
+
+        $task->setAssignee($assignee);
+        $entityManager->flush();
+
+        return $this->json($this->formatTask($task));
+    }
+
     #[OA\Delete(
         path: '/tasks/{id}',
         summary: 'Delete a task',
