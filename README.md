@@ -1,3 +1,37 @@
+# TaskFlow API
+
+API REST sécurisée développée avec Symfony dans le cadre du workshop :
+
+> Développer une application mobile sécurisée avec Swift et SwiftUI
+
+L’API permet la gestion de projets collaboratifs, tâches, membres et tags avec authentification JWT.
+
+---
+
+# Stack technique
+
+- Symfony 7
+- PHP 8.3
+- MariaDB / MySQL
+- Doctrine ORM
+- JWT (LexikJWTAuthenticationBundle)
+- NelmioApiDocBundle / OpenAPI
+- Voters Symfony
+- API REST JSON
+
+---
+
+# Installation
+
+## Cloner le projet
+
+```bash
+git clone https://github.com/YannMarchesseau/taskflow-api.git
+cd taskflow-api
+```
+
+---
+
 ## Installer les dépendances
 
 ```bash
@@ -62,7 +96,7 @@ https://127.0.0.1:8000
 
 ---
 
-# Documentation Swagger
+# Documentation Swagger / OpenAPI
 
 Disponible sur :
 
@@ -80,7 +114,7 @@ https://127.0.0.1:8000/api/doc
 POST /auth/register
 ```
 
-Exemple payload :
+Payload exemple :
 
 ```json
 {
@@ -93,13 +127,13 @@ Exemple payload :
 
 ---
 
-## Login
+## Connexion
 
 ```http
 POST /auth/login
 ```
 
-Exemple payload :
+Payload exemple :
 
 ```json
 {
@@ -108,7 +142,7 @@ Exemple payload :
 }
 ```
 
-Retour :
+Réponse :
 
 ```json
 {
@@ -119,9 +153,14 @@ Retour :
 ---
 
 # Endpoints principaux
-<img width="1843" height="1414" alt="taskFlowAPIdoc" src="https://github.com/user-attachments/assets/578b65e5-eb74-4a6a-8505-084e3a04b250" />
+<img width="895" height="1057" alt="TaskFlow-API" src="https://github.com/user-attachments/assets/bf0e029f-6924-40cf-8e57-fc1d9259e166" />
 
-## Projects
+
+---
+
+# Projects
+
+## Gestion des projets
 
 - `GET /projects`
 - `POST /projects`
@@ -129,22 +168,62 @@ Retour :
 - `PATCH /projects/{id}`
 - `DELETE /projects/{id}`
 
-## Tasks
+## Gestion des membres
+
+- `GET /projects/{id}/members`
+- `POST /projects/{id}/members`
+- `DELETE /projects/{id}/members/{userId}`
+
+---
+
+# Tasks
+
+## Gestion des tâches
 
 - `GET /projects/{id}/tasks`
 - `POST /projects/{id}/tasks`
 - `GET /tasks/{id}`
 - `PATCH /tasks/{id}`
 - `DELETE /tasks/{id}`
+
+## États des tâches
+
 - `POST /tasks/{id}/close`
 - `POST /tasks/{id}/open`
 
-## Tags
+## Assignation
+
+- `PATCH /tasks/{id}/assign`
+
+Payload exemple :
+
+```json
+{
+  "assigneeId": 3
+}
+```
+
+Pour retirer une assignation :
+
+```json
+{
+  "assigneeId": null
+}
+```
+
+---
+
+# Tags
+
+## Gestion des tags
 
 - `GET /projects/{id}/tags`
 - `POST /projects/{id}/tags`
 - `PATCH /tags/{id}`
 - `DELETE /tags/{id}`
+
+## Association tags / tâches
+
 - `POST /tasks/{id}/tags/{tagId}`
 - `DELETE /tasks/{id}/tags/{tagId}`
 
@@ -153,9 +232,11 @@ Retour :
 # Sécurité
 
 - Authentification JWT
-- Contrôle d’accès via Voters
+- Stockage sécurisé des mots de passe
+- Contrôle d’accès via Voters Symfony
 - Permissions par projet
-- Validation des données
+- Validation des payloads
+- Gestion des erreurs HTTP
 - Routes protégées
 
 ---
@@ -170,6 +251,32 @@ php bin/phpunit
 
 ---
 
+# Déploiement
+
+Le projet peut être déployé sur :
+
+- Render
+- Railway
+- VPS Linux
+- Docker
+
+Variables importantes :
+
+```env
+APP_ENV=prod
+APP_SECRET=
+DATABASE_URL=
+JWT_SECRET_KEY=%kernel.project_dir%/config/jwt/private.pem
+JWT_PUBLIC_KEY=%kernel.project_dir%/config/jwt/public.pem
+JWT_PASSPHRASE=
+```
+
+---
+
 # Auteur
+
 Yann Marchesseau
-Projet réalisé dans le cadre d'un workshop Leaning Campus "Développer une application mobile sécurisée avec SWIFT et SWIFTUI" T.
+
+Projet réalisé dans le cadre du workshop Learning Campus :
+
+> Développer une application mobile sécurisée avec Swift et SwiftUI
