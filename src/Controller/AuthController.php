@@ -158,8 +158,7 @@ final class AuthController extends AbstractController
         tags: ['Users'],
         responses: [
             new OA\Response(response: 200, description: 'Users list'),
-            new OA\Response(response: 401, description: 'Unauthorized'),
-            new OA\Response(response: 403, description: 'Access denied')
+            new OA\Response(response: 401, description: 'Unauthorized')
         ]
     )]
     #[Route('/users', name: 'user_index', methods: ['GET'])]
@@ -171,12 +170,6 @@ final class AuthController extends AbstractController
             return $this->json([
                 'message' => 'Unauthorized'
             ], 401);
-        }
-
-        if (!$currentUser->isManager()) {
-            return $this->json([
-                'message' => 'Access denied'
-            ], 403);
         }
 
         $users = $userRepository->findBy([], ['email' => 'ASC']);
